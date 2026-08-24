@@ -72,18 +72,18 @@
             </div>
         </div>
 
-        <h2 class="section-title" id="grid-title">Lagi Populer Hari Hari Ini</h2>
+        <h2 class="section-title" id="grid-title">Lagi Populer Hari Ini</h2>
         <div class="anime-grid" id="animeGrid"></div>
     </div>
 
     <script>
         const IMG_BASE = "https://xyz-api.animein.net";
-        let currentPosterUrl = ""; // Menyimpan gambar poster untuk latar belakang player
+        let currentPosterUrl = ""; 
 
+        // === FUNGSI GAMBAR DIPERBAIKI (TIDAK PAKAI PROXY MATI LAGI) ===
         function fixImg(u) {
             if (!u) return "https://via.placeholder.com/200x300?text=No+Image";
-            let rawUrl = u.startsWith("http") ? u : IMG_BASE + (u.startsWith("/") ? "" : "/") + u;
-            return "https://wsrv.nl/?url=" + encodeURIComponent(rawUrl);
+            return u.startsWith("http") ? u : IMG_BASE + (u.startsWith("/") ? "" : "/") + u;
         }
 
         async function fetchAPI(url) {
@@ -132,7 +132,7 @@
                 let card = document.createElement('div');
                 card.className = 'anime-card';
                 card.onclick = () => {
-                    currentPosterUrl = fixImg(m.image_poster); // Simpan poster untuk background player
+                    currentPosterUrl = fixImg(m.image_poster);
                     loadDetail(m.id, m.title);
                 };
                 card.innerHTML = `
@@ -201,7 +201,6 @@
                 serversHTML += '</div></div>';
                 serverContainer.innerHTML = serversHTML;
 
-                // Prioritaskan server IFRAME jika ada, kalau tidak ada baru ambil MP4 (Direct)
                 let bestServer = data.server.find(s => s.type === 'iframe' || s.type === 'semi') || 
                                  data.server.find(s => s.quality === '480p') || 
                                  data.server[0];
@@ -217,7 +216,6 @@
             }
         }
 
-        // === FUNGSI PEMUTAR CERDAS TERAKHIR ===
         window.switchServer = function(link, type, btnElement) {
             if(btnElement) {
                 document.querySelectorAll('#server-list-container .ep-btn').forEach(b => b.classList.remove('active'));
@@ -226,25 +224,18 @@
             
             const videoContainer = document.getElementById('video-wrapper');
             
-            // 1. JIKA SERVER IFRAME (Aman dari Blokir)
             if (type === 'iframe' || type === 'semi' || link.includes('embed') || link.includes('player')) {
-                videoContainer.innerHTML = `<iframe src="${link}" allowfullscreen allow="autoplay; fullscreen"></iframe>`;
-            } 
-            // 2. JIKA SERVER MP4 / DIRECT (Rawan Blokir CORS & X-Frame)
-            else {
-                // Tampilkan Poster Sinematik + Tombol Play Raksasa (Buka di Tab Baru)
+                videoContainer.innerHTML = `<iframe src="${link}" allowfullscreen allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>`;
+            } else {
                 videoContainer.innerHTML = `
                     <div style="width:100%; height:100%; background: url('${currentPosterUrl}') center/cover; position:relative; display:flex; justify-content:center; align-items:center;">
-                        <!-- Overlay Hitam Transparan -->
                         <div style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.75);"></div>
-                        
-                        <!-- Tombol Play -->
                         <a href="${link}" target="_blank" style="z-index:2; text-decoration:none; display:flex; flex-direction:column; align-items:center;">
                             <div style="background:#e50914; width:70px; height:70px; border-radius:50%; display:flex; justify-content:center; align-items:center; box-shadow:0 0 15px rgba(229,9,20,0.6); transition:transform 0.2s ease;">
                                 <svg width="35" height="35" viewBox="0 0 24 24" fill="white" style="margin-left: 5px;"><path d="M8 5v14l11-7z"/></svg>
                             </div>
                             <span style="color:white; font-family:sans-serif; margin-top:15px; font-weight:bold; font-size:16px;">▶ PUTAR VIDEO (MP4)</span>
-                            <span style="color:#bbb; font-size:11px; margin-top:5px; text-align:center; max-width:250px;">Buka di tab baru untuk menembus blokir server.</span>
+                            <span style="color:#bbb; font-size:11px; margin-top:5px; text-align:center; max-width:250px;">Buka di tab baru untuk memutar dengan pemutar bawaan HP.</span>
                         </a>
                     </div>
                 `;
