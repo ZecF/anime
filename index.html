@@ -27,10 +27,9 @@
         
         #player-section { display: none; background: #111; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
         
-        /* Wadah Video & Fallback */
+        /* Wadah Video Responsif (Aspek Rasio 16:9) */
         #video-wrapper { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; overflow: hidden; display: flex; justify-content: center; align-items: center; margin-bottom: 15px; position: relative; }
-        video { width: 100%; height: 100%; outline: none; }
-        iframe { width: 100%; height: 100%; border: none; }
+        iframe { width: 100%; height: 100%; border: none; background: #000; }
         
         .episode-list { display: flex; flex-wrap: wrap; gap: 10px; max-height: 250px; overflow-y: auto; padding-right: 5px; }
         .episode-list::-webkit-scrollbar { width: 6px; }
@@ -41,6 +40,7 @@
         
         #loading { text-align: center; color: #e50914; font-weight: bold; margin: 20px; display: none; }
         
+        /* Kotak Server */
         .server-box { background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
         .server-title { font-size: 12px; color: #aaa; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
     </style>
@@ -61,7 +61,10 @@
         <div id="player-section">
             <h2 id="play-title" style="margin-top: 0;">Judul Anime</h2>
             
+            <!-- Tempat Video Dimainkan -->
             <div id="video-wrapper"></div>
+            
+            <!-- Tempat Pilihan Server -->
             <div id="server-list-container"></div>
             
             <div>
@@ -189,12 +192,13 @@
                 serversHTML += '<div style="display:flex; flex-wrap:wrap; gap:8px;">';
                 
                 data.server.forEach((s, idx) => {
-                    let typeLabel = s.type === 'iframe' || s.type === 'semi' ? ' (Iframe)' : '';
+                    let typeLabel = s.type === 'iframe' || s.type === 'semi' ? ' (Iframe)' : ' (MP4)';
                     serversHTML += `<button class="ep-btn" onclick="switchServer('${s.link}', '${s.type}', this)">${s.name} ${s.quality}${typeLabel}</button>`;
                 });
                 serversHTML += '</div></div>';
                 serverContainer.innerHTML = serversHTML;
 
+                // Mengutamakan server 480p atau 720p sebagai standar keseimbangan kuota dan kualitas
                 let bestServer = data.server.find(s => s.quality === '480p') || 
                                  data.server.find(s => s.quality === '720p') || 
                                  data.server[0];
@@ -210,6 +214,7 @@
             }
         }
 
+        // === FUNGSI PEMUTAR ANTI-CORS FINAL ===
         window.switchServer = function(link, type, btnElement) {
             if(btnElement) {
                 document.querySelectorAll('#server-list-container .ep-btn').forEach(b => b.classList.remove('active'));
@@ -218,29 +223,10 @@
             
             const videoContainer = document.getElementById('video-wrapper');
             
-            if (type === 'iframe' || type === 'semi' || link.includes('embed') || link.includes('player')) {
-                videoContainer.innerHTML = `<iframe src="${link}" allowfullscreen allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>`;
-            } else {
-                // UI Fallback Cerdas jika video terkena IP-Lock
-                videoContainer.innerHTML = `
-                    <video id="videoPlayer" src="${link}" controls autoplay playsinline style="width:100%; height:100%; outline:none; background:#000;"></video>
-                    
-                    <div id="video-fallback" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:20px; box-sizing:border-box;">
-                        <div style="font-size:45px; margin-bottom:10px;">😭</div>
-                        <div style="color:white; font-size:14px; margin-bottom:15px; line-height:1.5;">
-                            <b>Video Diblokir (IP-Lock).</b><br>
-                            Sistem mendeteksi perbedaan jaringan antara Vercel dan HP-mu.<br>
-                            Tapi tenang, kamu tetap bisa menontonnya lewat tombol di bawah:
-                        </div>
-                        <a href="${link}" target="_blank" style="background:#e50914; color:white; text-decoration:none; padding:12px 25px; border-radius:30px; font-weight:bold; font-size:14px; box-shadow: 0 4px 10px rgba(229,9,20,0.4);">🚀 Buka Video & Tonton Sekarang</a>
-                    </div>
-                `;
-                
-                const videoElement = document.getElementById('videoPlayer');
-                videoElement.onerror = function() {
-                    document.getElementById('video-fallback').style.display = 'flex';
-                };
-            }
+            // Trik Sakti: Apapun formatnya (.mp4, direct, iframe, embed), HAJAR PAKAI IFRAME!
+            // Iframe menembus proteksi CORS dari Server Storage karena dihitung sebagai tab baru oleh browser.
+            // Untuk link .mp4, Chrome Android akan otomatis menyulap iframe tersebut jadi Native Video Player.
+            videoContainer.innerHTML = `<iframe src="${link}" allowfullscreen allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>`;
         };
 
         loadHome();
