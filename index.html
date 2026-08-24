@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poch1 Anime Stream</title>
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f0f0f; color: white; }
+        header { background: #1a1a1a; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e50914; }
+        header h1 { margin: 0; font-size: 24px; color: #e50914; cursor: pointer; }
+        .search-box { display: flex; gap: 10px; }
+        .search-box input { padding: 8px 15px; border-radius: 20px; border: 1px solid #333; background: #222; color: white; width: 250px; outline: none; }
+        .search-box button { background: #e50914; color: white; border: none; padding: 8px 20px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        
+        .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .section-title { margin-bottom: 20px; font-size: 20px; border-left: 4px solid #e50914; padding-left: 10px; }
+        
+        .anime-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
+        .anime-card { background: #1a1a1a; border-radius: 8px; overflow: hidden; cursor: pointer; transition: transform 0.2s; }
+        .anime-card:hover { transform: scale(1.05); }
+        .anime-card img { width: 100%; height: 260px; object-fit: cover; }
+        .anime-info { padding: 10px; }
+        .anime-title { font-size: 14px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
+        .anime-meta { font-size: 11px; color: #aaa; display: flex; justify-content: space-between; }
+        
+        #player-section { display: none; background: #111; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        video { width: 100%; max-height: 500px; background: #000; border-radius: 8px; outline: none; }
+        .episode-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; max-height: 200px; overflow-y: auto; }
+        .ep-btn { background: #222; color: #fff; border: 1px solid #444; padding: 8px 15px; border-radius: 5px; cursor: pointer; }
+        .ep-btn:hover, .ep-btn.active { background: #e50914; border-color: #e50914; }
+        
+        #loading { text-align: center; color: #e50914; font-weight: bold; margin: 20px; display: none; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1 onclick="loadHome()">POCH1 ANIME</h1>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Cari anime favoritmu..." onkeypress="if(event.key==='Enter') searchAnime()">
+            <button onclick="searchAnime()">CARI</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div id="loading">Memuat data dari server Python... ⏳</div>
+        
+        <div id="player-section">
+            <h2 id="play-title">Judul Anime</h2>
+            <video id="videoPlayer" controls autoplay></video>
+            <div style="margin-top: 15px;">
+                <h3 style="margin-bottom:10px;">Daftar Episode:</h3>
+                <div class="episode-list" id="ep-list"></div>
+            </div>
+        </div>
+
+        <h2 class="section-title" id="grid-title">Lagi Populer Hari Ini</h2>
+        <div class="anime-grid" id="animeGrid"></div>
+    </div>
+
+    <script>
+        const IMG_BASE = "https://xyz-api.animein.net";
+
+        function fixImg(u) {
+            if (!u) return "https://via.placeholder.com/200x300?text=No+Image";
+            if (u.startsWith("http")) return u;
+            return IMG_BASE + (u.startsWith("/") ? "" : "/") + u;
+        }
+
+        async function fetchAPI(url) {
+            document.getElementById('loading').style.display = 'block';
+            try {
+                let res = await fetch(url);
+                let json = await res.json();
+                document.getElementById('loading').style.display = 'none';
+                return json.data;
+            } catch (err) {
+                alert('Gagal mengambil data dari server!');
+                document.getElementById('loading').style.display = 'none';
+                return null;
+            }
+        }
+
+        async function loadHome() {
+            document.getElementById('player-section').style.display = 'none';
+            document.getElementById('grid-title').innerText = "Lagi Populer Hari Ini";
+            const data = await fetchAPI('/api/home');
+            if (data && data.popular) renderGrid(data.popular);
+        }
+
+        async function searchAnime() {
+            const keyword = document.getElementById('searchInput').value;
+            if(!keyword) return;
+            document.getElementById('player-section').style.display = 'none';
+            document.getElementById('grid-title').innerText = `Hasil Pencarian: "${keyword}"`;
+            const data = await fetchAPI(`/api/search?keyword=${encodeURIComponent(keyword)}`);
+            if (data && data.movie) renderGrid(data.movie);
+        }
+
+        function renderGrid(movies) {
+            const grid = document.getElementById('animeGrid');
+            grid.innerHTML = '';
+            movies.forEach(m => {
+                let card = document.createElement('div');
+                card.className = 'anime-card';
+                card.onclick = () => loadDetail(m.id, m.title);
+                card.innerHTML = `
+                    <img src="${fixImg(m.image_poster)}" loading="lazy">
+                    <div class="anime-info">
+                        <div class="anime-title" title="${m.title}">${m.title}</div>
+                        <div class="anime-meta">
+                            <span>⭐ ${m.rating || '-'}</span>
+                            <span>👁️ ${m.views || 0}</span>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        async function loadDetail(id, title) {
+            document.getElementById('play-title').innerText = title;
+            document.getElementById('player-section').style.display = 'block';
+            window.scrollTo(0, 0); 
+            
+            const data = await fetchAPI(`/api/episodes/${id}`);
+            const epList = document.getElementById('ep-list');
+            epList.innerHTML = '';
+
+            if (data && data.episode) {
+                const eps = data.episode.reverse(); 
+                eps.forEach(ep => {
+                    let btn = document.createElement('button');
+                    btn.className = 'ep-btn';
+                    btn.innerText = `Ep. ${ep.index}`;
+                    btn.onclick = (e) => {
+                        document.querySelectorAll('.ep-btn').forEach(b => b.classList.remove('active'));
+                        e.target.classList.add('active');
+                        playEpisode(ep.id, ep.title);
+                    };
+                    epList.appendChild(btn);
+                });
+            } else {
+                epList.innerHTML = '<span style="color:#aaa;">Belum ada episode tersedia.</span>';
+            }
+        }
+
+        async function playEpisode(epId, epTitle) {
+            document.getElementById('play-title').innerText = epTitle;
+            const data = await fetchAPI(`/api/stream/${epId}`);
+            
+            if (data && data.server && data.server.length > 0) {
+                let bestServer = data.server.find(s => s.type === 'direct' && s.quality === '720p') || 
+                                 data.server.find(s => s.type === 'direct' && s.quality === '480p') || 
+                                 data.server[0];
+                
+                if(bestServer && bestServer.link) {
+                    const video = document.getElementById('videoPlayer');
+                    video.src = bestServer.link;
+                    video.play();
+                } else {
+                    alert('Format video tidak didukung atau link rusak.');
+                }
+            } else {
+                alert('Gagal mengambil server video!');
+            }
+        }
+
+        loadHome();
+    </script>
+</body>
+</html>
