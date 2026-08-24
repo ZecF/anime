@@ -3,12 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Meta penyamaran tingkat tinggi -->
     <meta name="referrer" content="no-referrer">
     <title>Poch1 Anime Stream</title>
-    
-    <!-- Mesin Shaka Player untuk memutar format m3u8 di Android -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.3.5/shaka-player.compiled.js"></script>
     
     <style>
         body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f0f0f; color: white; }
@@ -31,8 +27,8 @@
         
         #player-section { display: none; background: #111; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
         
-        /* Wadah Video Responsif */
-        #video-wrapper { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; overflow: hidden; display: flex; justify-content: center; align-items: center; margin-bottom: 15px; }
+        /* Wadah Video Responsif (Aspek Rasio 16:9) */
+        #video-wrapper { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; overflow: hidden; display: flex; justify-content: center; align-items: center; margin-bottom: 15px; position: relative;}
         video { width: 100%; height: 100%; outline: none; }
         iframe { width: 100%; height: 100%; border: none; }
         
@@ -66,7 +62,10 @@
         <div id="player-section">
             <h2 id="play-title" style="margin-top: 0;">Judul Anime</h2>
             
+            <!-- Tempat Video Dimainkan -->
             <div id="video-wrapper"></div>
+            
+            <!-- Tempat Pilihan Server -->
             <div id="server-list-container"></div>
             
             <div>
@@ -81,16 +80,11 @@
 
     <script>
         const IMG_BASE = "https://xyz-api.animein.net";
-        let shakaPlayerInstance = null; // Menyimpan instance Shaka Player
-
-        // Instal polyfill Shaka Player saat web dimuat
-        document.addEventListener('DOMContentLoaded', () => {
-            shaka.polyfill.installAll();
-        });
 
         function fixImg(u) {
             if (!u) return "https://via.placeholder.com/200x300?text=No+Image";
-            return u.startsWith("http") ? u : IMG_BASE + (u.startsWith("/") ? "" : "/") + u;
+            let rawUrl = u.startsWith("http") ? u : IMG_BASE + (u.startsWith("/") ? "" : "/") + u;
+            return "https://wsrv.nl/?url=" + encodeURIComponent(rawUrl);
         }
 
         async function fetchAPI(url) {
@@ -139,8 +133,6 @@
                 let card = document.createElement('div');
                 card.className = 'anime-card';
                 card.onclick = () => loadDetail(m.id, m.title);
-                
-                // Tambahkan referrerpolicy="no-referrer" agar AnimeIn tidak bisa memblokir gambarnya
                 card.innerHTML = `
                     <img src="${fixImg(m.image_poster)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.src='https://via.placeholder.com/200x300?text=No+Image'">
                     <div class="anime-info">
@@ -197,19 +189,20 @@
             
             if (data && data.server && data.server.length > 0) {
                 let serversHTML = '<div class="server-box">';
-                serversHTML += '<div class="server-title">PILIH SERVER (Jika video error/abu-abu, coba klik server lain):</div>';
+                serversHTML += '<div class="server-title">PILIH SERVER (Jika video loading terus, pilih resolusi lebih rendah):</div>';
                 serversHTML += '<div style="display:flex; flex-wrap:wrap; gap:8px;">';
                 
                 data.server.forEach((s, idx) => {
-                    // Beri tanda jika server itu Iframe
                     let typeLabel = s.type === 'iframe' || s.type === 'semi' ? ' (Iframe)' : '';
                     serversHTML += `<button class="ep-btn" onclick="switchServer('${s.link}', '${s.type}', this)">${s.name} ${s.quality}${typeLabel}</button>`;
                 });
                 serversHTML += '</div></div>';
                 serverContainer.innerHTML = serversHTML;
 
-                // Prioritaskan server IFRAME karena lebih kebal dari pemblokiran IP
-                let bestServer = data.server.find(s => s.type === 'iframe' || s.type === 'semi') || data.server[0];
+                // Memilih server default 480p atau 720p untuk Rapsodi
+                let bestServer = data.server.find(s => s.quality === '480p') || 
+                                 data.server.find(s => s.quality === '720p') || 
+                                 data.server[0];
                                  
                 setTimeout(() => {
                     let btns = serverContainer.querySelectorAll('.ep-btn');
@@ -222,7 +215,7 @@
             }
         }
 
-        // FUNGSI GANTI SERVER DINAMIS (DENGAN SHAKA PLAYER UNTUK .m3u8)
+        // FUNGSI GANTI SERVER DINAMIS (TANPA SHAKA PLAYER UNTUK BYPASS CORS GOOGLE)
         window.switchServer = function(link, type, btnElement) {
             if(btnElement) {
                 document.querySelectorAll('#server-list-container .ep-btn').forEach(b => b.classList.remove('active'));
@@ -231,36 +224,22 @@
             
             const videoContainer = document.getElementById('video-wrapper');
             
-            // Bersihkan instance Shaka Player jika ada
-            if (shakaPlayerInstance) {
-                shakaPlayerInstance.destroy();
-                shakaPlayerInstance = null;
-            }
-            
-            // Jika link berupa Iframe
             if (type === 'iframe' || type === 'semi' || link.includes('embed') || link.includes('player')) {
                 videoContainer.innerHTML = `<iframe src="${link}" allowfullscreen allow="autoplay; fullscreen" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>`;
-            } 
-            // Jika link berupa Direct (mp4 atau m3u8)
-            else {
-                videoContainer.innerHTML = `<video id="videoPlayer" controls autoplay playsinline style="width:100%; height:100%; outline:none; background:#000;"></video>`;
+            } else {
+                // Menggunakan Video HTML5 Asli agar tidak terkena blokir CORS dari Google/Blogger
+                videoContainer.innerHTML = `<video id="videoPlayer" src="${link}" controls autoplay playsinline style="width:100%; height:100%; outline:none; background:#000;"></video>`;
+                
                 const videoElement = document.getElementById('videoPlayer');
-                
-                // Gunakan Shaka Player agar Chrome Android bisa memutar format HLS/m3u8
-                shakaPlayerInstance = new shaka.Player(videoElement);
-                shakaPlayerInstance.configure({
-                    streaming: { retryParameters: { maxAttempts: 3 } }
-                });
-                
-                shakaPlayerInstance.load(link).catch(function(error) {
-                    console.error('Shaka Error:', error);
+                videoElement.onerror = function() {
                     videoContainer.innerHTML = `
                         <div style="color:#ff3333; padding: 20px; text-align:center;">
-                            <b>❌ Server ini menolak koneksi (Dibatasi IP/CORS).</b><br><br>
-                            Silakan klik tombol <b>Server Lain</b> di kotak atas (Pilih yang ada tulisan Iframe).
+                            <b>❌ Video gagal diputar.</b><br><br>
+                            Server ini sedang bermasalah atau kecepatan internet tidak stabil.<br>
+                            Silakan coba klik <b>resolusi yang lebih rendah (misal: 360p atau 480p)</b> di atas.
                         </div>
                     `;
-                });
+                };
             }
         };
 
@@ -268,4 +247,3 @@
     </script>
 </body>
 </html>
-
